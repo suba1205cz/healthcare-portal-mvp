@@ -24,3 +24,25 @@ router.get('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+router.post('/', async (req, res) => {
+  const { userId, category, specialties, location, hourlyRate } = req.body;
+  try {
+    const profile = await prisma.profile.create({
+      data: {
+        userId: Number(userId),
+        bio: '',
+        specialties,
+        location,
+        hourlyRate: Number(hourlyRate) || 0,
+        // if you added category to schema, add it here too
+      },
+    });
+    res.json(profile);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: 'Could not create professional profile' });
+  }
+});
