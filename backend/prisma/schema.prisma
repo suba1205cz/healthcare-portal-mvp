@@ -67,6 +67,7 @@ model Booking {
 enum Role {
   PATIENT
   PROFESSIONAL
+  ADMIN
 }
 
 enum BookingStatus {
