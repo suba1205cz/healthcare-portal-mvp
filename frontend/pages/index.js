@@ -1,270 +1,234 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import Layout from "../components/Layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-// same list we used in register-professional
-const INDIA_STATES = [
-  "All (India + others)",
-  "Kerala",
-  "Tamil Nadu",
-  "Karnataka",
-  "Telangana",
-  "Maharashtra",
-  "Delhi",
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 export default function HomePage() {
   const [professionals, setProfessionals] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("ALL");
-  const [stateFilter, setStateFilter] = useState("All (India + others)");
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [region, setRegion] = useState("all");
+  const [date, setDate] = useState("");        // yyyy-mm-dd
+  const [time, setTime] = useState("");        // hh:mm
+  const [filteredByAvailability, setFilteredByAvailability] = useState(false);
 
+  // small helper to build date-time in ISO
+  const buildISO = (d, t) => {
+    // t = "10:00"
+    // we’ll treat entered time as local and convert to ISO
+    const iso = new Date(`${d}T${t}:00`);
+    return iso.toISOString();
+  };
+
+  // load ALL professionals (default)
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/api/professionals`);
+      setProfessionals(res.data || []);
+      setFilteredByAvailability(false);
+    } catch (err) {
+      console.error("fetch professionals failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // first load
   useEffect(() => {
-    async function load() {
+    loadAll();
+  }, []);
+
+  // when user clicks “Search” or changes filters
+  const handleSearch = async () => {
+    // if date and time given → call /search
+    if (date && time) {
+      const startISO = buildISO(date, time);
+      // we’ll assume 1 hour slot for now
+      const endISO = new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
+
+      setLoading(true);
       try {
-        const res = await axios.get(`${API_URL}/api/professionals`);
-        // sort so newest shows first
-        const list = (res.data || []).sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        const res = await axios.get(
+          `${API_BASE}/api/professionals/search`,
+          {
+            params: {
+              start: startISO,
+              end: endISO,
+              q: search || "",
+            },
+          }
         );
-        setProfessionals(list);
-        setFiltered(list);
+        setProfessionals(res.data || []);
+        setFilteredByAvailability(true);
       } catch (err) {
-        console.error("Failed to fetch professionals", err);
+        console.error("availability search failed", err);
       } finally {
         setLoading(false);
       }
+      return;
     }
-    load();
-  }, []);
 
-  // whenever search/filter changes, re-filter
-  useEffect(() => {
-    let data = [...professionals];
-
-    // text search
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      data = data.filter((p) => {
-        const name = p.user?.name?.toLowerCase() || "";
-        const specs = p.specialties?.toLowerCase() || "";
-        const loc = p.location?.toLowerCase() || "";
-        return name.includes(s) || specs.includes(s) || loc.includes(s);
+    // otherwise → normal list with text filter
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/api/professionals`, {
+        params: { q: search || "" },
       });
+      setProfessionals(res.data || []);
+      setFilteredByAvailability(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    // category filter (we don't store category yet, so we infer from specialties)
-    if (category !== "ALL") {
-      data = data.filter((p) => {
-        const specs = (p.specialties || "").toLowerCase();
-        if (category === "NURSE") {
-          return specs.includes("nurse") || specs.includes("post-op");
-        }
-        if (category === "PHYSIO") {
-          return specs.includes("physio") || specs.includes("therapy");
-        }
-        return true;
-      });
-    }
-
-    // state filter — we check if location contains that word
-    if (stateFilter !== "All (India + others)") {
-      data = data.filter((p) =>
-        (p.location || "").toLowerCase().includes(stateFilter.toLowerCase())
-      );
-    }
-
-    setFiltered(data);
-  }, [search, category, stateFilter, professionals]);
+  };
 
   return (
-    <Layout>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="min-h-screen bg-[#f3f4f6]">
+      {/* top bar is in layout.js now so we just render body */}
+      <main className="max-w-6xl mx-auto py-6 px-4">
         {/* hero */}
-        <div
-          style={{
-            background: "linear-gradient(135deg, #e0edff, #ffffff)",
-            borderRadius: "1.25rem",
-            padding: "1.6rem 1.8rem",
-            marginBottom: "1.5rem",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: "1rem",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: "1.8rem", marginBottom: "0.4rem" }}>
-              Find Home Nursing & Physiotherapy
+        <div className="bg-[#e5f0ff] rounded-3xl px-10 py-10 flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-semibold text-[#102a43] mb-2">
+              Find Home Nursing &amp; Physiotherapy
             </h1>
-            <p style={{ color: "#4b5563" }}>
+            <p className="text-[#475569]">
               Book verified professionals near you. Kerala, TN, KA — and expats abroad.
             </p>
           </div>
-          {/* placeholder for image */}
-          <div
-            style={{
-              width: 140,
-              height: 90,
-              background: "white",
-              borderRadius: "1rem",
-              border: "1px dashed #cbd5f5",
-              display: "grid",
-              placeItems: "center",
-              color: "#9ca3af",
-              fontSize: "0.7rem",
-            }}
-          >
+          <div className="w-48 h-28 rounded-2xl border-2 border-dashed border-[#cbd5f5] flex items-center justify-center text-sm text-[#94a3b8] text-center">
             patient-care image
           </div>
         </div>
 
         {/* filters */}
-        <div
-          style={{
-            display: "flex",
-            gap: "0.75rem",
-            marginBottom: "1rem",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="flex flex-wrap gap-3 mb-5">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, specialty, location..."
-            style={{
-              flex: 3,
-              minWidth: 220,
-              border: "1px solid #d1d5db",
-              borderRadius: "0.5rem",
-              padding: "0.5rem 0.7rem",
-              background: "white",
-            }}
+            className="flex-1 min-w-[220px] border rounded-lg px-3 py-2 bg-white"
+          />
+
+          {/* date */}
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="border rounded-lg px-3 py-2 bg-white"
+          />
+
+          {/* time */}
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="border rounded-lg px-3 py-2 bg-white"
           />
 
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            style={filterSelect}
+            className="border rounded-lg px-3 py-2 bg-white"
           >
-            <option value="ALL">All categories</option>
-            <option value="NURSE">Nurses</option>
-            <option value="PHYSIO">Physiotherapists</option>
+            <option value="all">All categories</option>
+            <option value="Nurse">Nurse</option>
+            <option value="Physiotherapist">Physiotherapist</option>
           </select>
 
           <select
-            value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value)}
-            style={filterSelect}
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className="border rounded-lg px-3 py-2 bg-white"
           >
-            {INDIA_STATES.map((st) => (
-              <option key={st} value={st}>
-                {st}
-              </option>
-            ))}
-            {/* for Brno etc */}
-            <option value="Brno">Brno (CZ)</option>
+            <option value="all">All (India + others)</option>
+            <option value="Kerala">Kerala</option>
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Chennai">Chennai</option>
+            <option value="Bengaluru">Bengaluru</option>
           </select>
+
+          <button
+            onClick={handleSearch}
+            className="bg-[#2563eb] text-white px-5 py-2 rounded-lg font-medium hover:bg-[#1d4ed8]"
+          >
+            Search
+          </button>
         </div>
+
+        {filteredByAvailability && (
+          <p className="text-sm text-green-700 mb-3">
+            Showing professionals who are free at {date} {time} (1 hour slot)
+          </p>
+        )}
 
         {/* list */}
         {loading ? (
           <p>Loading professionals…</p>
-        ) : filtered.length === 0 ? (
-          <p>No professionals found. Try another filter.</p>
+        ) : professionals.length === 0 ? (
+          <p>No professionals found.</p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-              gap: "1rem",
-            }}
-          >
-            {filtered.map((pro) => (
-              <ProfessionalCard key={pro.id} pro={pro} />
-            ))}
+          <div className="grid md:grid-cols-3 gap-5">
+            {professionals
+              .filter((p) => {
+                // apply local filters (category / region)
+                let ok = true;
+                if (category !== "all") {
+                  // we didn’t store category on profile, so we check specialties text
+                  ok =
+                    p.specialties?.toLowerCase().includes(category.toLowerCase()) ||
+                    p.user?.role === "PROFESSIONAL";
+                }
+                if (ok && region !== "all") {
+                  ok =
+                    p.location?.toLowerCase().includes(region.toLowerCase());
+                }
+                return ok;
+              })
+              .map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-2"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#2563eb] text-white flex items-center justify-center font-semibold">
+                      {(p.user?.name || p.name || "U").slice(0, 1).toUpperCase()}
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-[#102a43]">
+                        {p.user?.name || p.name}
+                      </h2>
+                      <p className="text-xs text-[#94a3b8]">
+                        {p.location || "India"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm">
+                    <span className="font-semibold">Specialties:</span>{" "}
+                    {p.specialties || "Not specified"}
+                  </p>
+                  <p className="text-sm">
+                    From{" "}
+                    <span className="font-semibold">
+                      {p.hourlyRate ? p.hourlyRate : "800"}
+                    </span>{" "}
+                    per hour
+                  </p>
+                  <a
+                    href={`/professionals/${p.id}`}
+                    className="text-[#2563eb] text-sm font-medium"
+                  >
+                    View &amp; Book →
+                  </a>
+                </div>
+              ))}
           </div>
         )}
-      </div>
-    </Layout>
-  );
-}
-
-function ProfessionalCard({ pro }) {
-  const name = pro.user?.name || "Unnamed professional";
-  const specialties = pro.specialties || "Not specified";
-  const location = pro.location || "Not specified";
-
-  return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "1rem",
-        padding: "1rem",
-        border: "1px solid #e5e7eb",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.35rem",
-        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.03)",
-      }}
-    >
-      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "9999px",
-            background: "#2563eb",
-            color: "white",
-            display: "grid",
-            placeItems: "center",
-            fontWeight: 700,
-          }}
-        >
-          {name.charAt(0).toUpperCase()}
-        </div>
-        <div>
-          <div style={{ fontWeight: 600 }}>{name}</div>
-          <div style={{ fontSize: "0.7rem", color: "#6b7280" }}>
-            {location}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ fontSize: "0.8rem", color: "#4b5563" }}>
-        <strong>Specialties:</strong> {specialties}
-      </div>
-
-      {typeof pro.hourlyRate === "number" && pro.hourlyRate > 0 && (
-        <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-          From <strong>{pro.hourlyRate}</strong> per hour
-        </div>
-      )}
-
-      <a
-        href={`/professionals/${pro.id}`}
-        style={{
-          marginTop: "0.4rem",
-          display: "inline-block",
-          fontSize: "0.8rem",
-          color: "#2563eb",
-        }}
-      >
-        View & Book →
-      </a>
+      </main>
     </div>
   );
 }
-
-const filterSelect = {
-  flex: 1,
-  minWidth: 160,
-  border: "1px solid #d1d5db",
-  borderRadius: "0.5rem",
-  padding: "0.45rem 0.6rem",
-  background: "white",
-};
