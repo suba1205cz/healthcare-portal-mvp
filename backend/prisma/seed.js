@@ -1,18 +1,95 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const bcrypt = require('bcryptjs');
 
 async function main() {
-  const hashed = await require('bcryptjs').hash('password', 10);
-  const profUser = await prisma.user.create({ data: { name: 'Dr. Alice Physio', email: 'alice@demo.com', password: hashed, role: 'PROFESSIONAL' } });
-  const profile = await prisma.profile.create({ data: { userId: profUser.id, bio: 'Experienced physiotherapist', specialties: 'physiotherapy,back pain', location: 'Brno', hourlyRate: 25 } });
+  const hashed = await bcrypt.hash('password', 10);
 
-  const now = new Date();
-  await prisma.availability.createMany({ data: [
-    { profileId: profile.id, start: new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 9,0), end: new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 10,0) },
-    { profileId: profile.id, start: new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 10,30), end: new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 11,30) }
-  ]});
+  // 1) make sure the professional user exists
+  const profUser = await prisma.user.upsert({
+    where: { email: 'alice@demo.com' },
+    update: {}, // nothing to update now
+    create: {
+      name: 'Dr. Alice Physio',
+      email: 'alice@demo.com',
+      password: hashed,
+      role: 'PROFESSIONAL',
+    },
+  });
 
-  console.log('Seed complete');
+  // 2) make sure the profile exists
+  const profile = await prisma.profile.upsert({
+    where: { userId: profUser.id },
+    update: {
+      bio: 'Experienced physiotherapist',
+      specialties: 'physiotherapy,back pain',
+      location: 'Brno',
+      hourlyRate: 25,
+    },
+    create: {
+      userId: profUser.id,
+      bio: 'Experienced physiotherapist',
+      specialties: 'physiotherapy,back pain',
+      location: 'Brno',
+      hourlyRate: 25,
+    },
+  });
+
+  // 3) add an availability slot
+  await prisma.availability.upsert({
+    where: {
+      // make a deterministic key so we don't create infinite rows
+      id: 1,
+    },
+    update: {
+      profileId: profile.id,
+      start: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow
+      end: new Date(Date.now() + 25 * 60 * 60 * 1000),
+      isBooked: false,
+    },
+    create: {
+      profileId: profile.id,
+      start: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      end: new Date(Date.now() + 25 * 60 * 60 * 1000),
+      isBooked: false,
+    },
+  });
+
+  console.log('✅ Seed finished');
 }
 
-main().catch(e => console.error(e)).finally(() => process.exit());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+
+async function main() {
+  const hashedPassword = await bcrypt.hash('Admin@123', 10);
+
+  await prisma.user.upsert({
+    where: { email: 'admin@healthcare.com' },
+    update: {},
+    create: {
+      name: 'Super Admin',
+      email: 'admin@healthcare.com',
+      password: hashedPassword,
+      role: 'ADMIN',
+    },
+  });
+
+  console.log('✅ Admin user seeded successfully');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
