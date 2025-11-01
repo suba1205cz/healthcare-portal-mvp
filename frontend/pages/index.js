@@ -13,12 +13,27 @@ export default function HomePage() {
   const [time, setTime] = useState("");
   const [filteredByAvailability, setFilteredByAvailability] = useState(false);
 
+  // logged-in user (from localStorage)
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("subaacare-user");
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch (e) {
+          console.warn("bad user in storage");
+        }
+      }
+    }
+  }, []);
+
   const buildISO = (d, t) => {
     const iso = new Date(`${d}T${t}:00`);
     return iso.toISOString();
   };
 
-  // load all (old behaviour)
   const loadAll = async () => {
     setLoading(true);
     try {
@@ -37,7 +52,7 @@ export default function HomePage() {
   }, []);
 
   const handleSearch = async () => {
-    // if user chose date + time → availability search
+    // availability search
     if (date && time) {
       const startISO = buildISO(date, time);
       const endISO = new Date(
@@ -46,16 +61,13 @@ export default function HomePage() {
 
       setLoading(true);
       try {
-        const res = await axios.get(
-          `${API_BASE}/api/professionals/search`,
-          {
-            params: {
-              start: startISO,
-              end: endISO,
-              q: search || "",
-            },
-          }
-        );
+        const res = await axios.get(`${API_BASE}/api/professionals/search`, {
+          params: {
+            start: startISO,
+            end: endISO,
+            q: search || "",
+          },
+        });
         setProfessionals(res.data || []);
         setFilteredByAvailability(true);
       } catch (err) {
@@ -66,7 +78,7 @@ export default function HomePage() {
       return;
     }
 
-    // otherwise → old text search
+    // normal search
     setLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/api/professionals`, {
@@ -81,7 +93,14 @@ export default function HomePage() {
     }
   };
 
-  // simple card style so it looks like your last nice version
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("subaacare-user");
+      window.localStorage.removeItem("subaacare-token");
+      setUser(null);
+    }
+  };
+
   const cardStyle = {
     background: "#ffffff",
     borderRadius: "18px",
@@ -94,9 +113,109 @@ export default function HomePage() {
 
   return (
     <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
-      {/* main wrapper */}
+      {/* ====== TOP BAR (restored) ====== */}
+      <div
+        style={{
+          width: "100%",
+          background: "#ffffff",
+          borderBottom: "1px solid #e5e7eb",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "1100px",
+            margin: "0 auto",
+            padding: "12px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "20px",
+          }}
+        >
+          {/* left: logo + tagline */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                width: "34px",
+                height: "34px",
+                borderRadius: "9999px",
+                background: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontWeight: 600,
+              }}
+            >
+              S
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "15px" }}>
+                Subaa Care
+              </div>
+              <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                We care those who you care
+              </div>
+            </div>
+          </div>
+
+          {/* right: links */}
+          <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+            <a href="/" style={{ fontSize: "13px", color: "#0f172a" }}>
+              Home
+            </a>
+            <a
+              href="/register-professional"
+              style={{ fontSize: "13px", color: "#0f172a" }}
+            >
+              Join as professional
+            </a>
+            {!user ? (
+              <>
+                <a
+                  href="/register"
+                  style={{ fontSize: "13px", color: "#0f172a" }}
+                >
+                  Register
+                </a>
+                <a
+                  href="/login"
+                  style={{
+                    fontSize: "13px",
+                    background: "#2563eb",
+                    color: "#fff",
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                  }}
+                >
+                  Sign in
+                </a>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: "13px" }}>👋 {user.name}</span>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    fontSize: "13px",
+                    background: "#e2e8f0",
+                    border: "none",
+                    padding: "5px 12px",
+                    borderRadius: "9999px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Logout
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ====== PAGE CONTENT ====== */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px" }}>
-        {/* hero box */}
+        {/* hero */}
         <div
           style={{
             background: "rgba(210, 226, 255, 0.8)",
@@ -106,6 +225,7 @@ export default function HomePage() {
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "20px",
+            marginTop: "8px",
           }}
         >
           <div>
@@ -142,7 +262,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* filters row */}
+        {/* filters */}
         <div
           style={{
             display: "flex",
@@ -290,7 +410,9 @@ export default function HomePage() {
                         fontWeight: 600,
                       }}
                     >
-                      {(p.user?.name || p.name || "U").slice(0, 1).toUpperCase()}
+                      {(p.user?.name || p.name || "U")
+                        .slice(0, 1)
+                        .toUpperCase()}
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, color: "#102a43" }}>
