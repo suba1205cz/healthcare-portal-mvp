@@ -1,76 +1,56 @@
+import Link from "next/link";
+
 export default function Layout({ children }) {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f6f7fb",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}
-    >
+    <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
+      {/* topbar */}
       <header
         style={{
           background: "white",
           borderBottom: "1px solid #e5e7eb",
-          padding: "0.75rem 1.5rem",
+          padding: "0.7rem 1.5rem",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: "1rem",
         }}
       >
-        {/* LEFT: logo + name */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          {/* placeholder logo */}
+        <div style={{ display: "flex", gap: "0.7rem", alignItems: "center" }}>
           <div
             style={{
-              width: 34,
-              height: 34,
+              width: 38,
+              height: 38,
               borderRadius: "9999px",
               background: "#2563eb",
-              color: "white",
               display: "grid",
               placeItems: "center",
+              color: "white",
               fontWeight: 700,
             }}
           >
-            H
+            S
           </div>
           <div>
-            <div style={{ fontWeight: 700 }}>HealConnect (placeholder)</div>
+            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+              Subaa Care
+            </div>
             <div style={{ fontSize: "0.7rem", color: "#6b7280" }}>
-              Nursing & Physiotherapy on demand
+              We care for those you care 💙
             </div>
           </div>
         </div>
 
-        {/* RIGHT: simple links */}
-        <nav style={{ display: "flex", gap: "1rem", fontSize: "0.85rem" }}>
-          <a href="/" style={{ color: "#374151", textDecoration: "none" }}>
-            Home
-          </a>
-          <a href="/register-professional" style={{ color: "#374151", textDecoration: "none" }}>
-            Join as professional
-          </a>
-          <a href="/register" style={{ color: "#2563eb", textDecoration: "none" }}>
-            Register
-          </a>
-          <a href="/login" style={{ color: "#111827", textDecoration: "none", fontWeight: 500 }}>
+        <nav style={{ display: "flex", gap: "1.25rem", fontSize: "0.9rem" }}>
+          <Link href="/">Home</Link>
+          <Link href="/register-professional">Join as professional</Link>
+          <Link href="/register">Register</Link>
+          <Link href="/login" style={{ fontWeight: 600 }}>
             Sign in
-          </a>
+          </Link>
         </nav>
       </header>
 
-      <main style={{ padding: "2.5rem 1.25rem" }}>{children}</main>
-
-      <footer
-        style={{
-          textAlign: "center",
-          color: "#9ca3af",
-          fontSize: "0.7rem",
-          padding: "1.5rem 0",
-        }}
-      >
-        © {new Date().getFullYear()} HealConnect — placeholder. We will replace with your company.
-      </footer>
+      <main style={{ padding: "1.5rem" }}>{children}</main>
     </div>
   );
 }
