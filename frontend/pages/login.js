@@ -1,3 +1,4 @@
+// frontend/pages/login.js
 import { useState } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
@@ -7,8 +8,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("test@example.com"); // for quick tests
+  const [password, setPassword] = useState("123456");
   const [message, setMessage] = useState("");
 
   async function handleSubmit(e) {
@@ -21,18 +22,30 @@ export default function LoginPage() {
         password,
       });
 
-      // save token + user
+      // backend returns { token, user }
+      const { token, user } = res.data || {};
+
+      if (!token || !user) {
+        setMessage("Login failed: no token/user in response");
+        return;
+      }
+
+      // 👇 THIS is the part that makes the navbar know who you are
       if (typeof window !== "undefined") {
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
+        window.localStorage.setItem("token", token);
+        window.localStorage.setItem("user", JSON.stringify(user));
       }
 
       setMessage("Login successful. Redirecting…");
-      // go home
+      // force reload so Layout re-reads localStorage
       router.push("/");
     } catch (err) {
-      console.error(err);
-      setMessage("Login failed. Check email/password.");
+      console.error("LOGIN ERROR", err?.response?.data || err.message);
+      setMessage(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Login failed"
+      );
     }
   }
 
@@ -40,47 +53,44 @@ export default function LoginPage() {
     <Layout>
       <div
         style={{
-          maxWidth: 400,
-          margin: "0 auto",
+          maxWidth: 480,
+          margin: "2rem auto",
           background: "white",
-          padding: "1.5rem 1.5rem 1.2rem",
           borderRadius: "1rem",
+          padding: "1.5rem",
           border: "1px solid #e5e7eb",
         }}
       >
-        <h1 style={{ fontSize: "1.4rem", marginBottom: "1rem" }}>Sign in</h1>
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem" }}>
+        <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Sign in</h1>
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.85rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.8rem" }}>Email</label>
+            <label style={{ fontSize: "0.8rem" }}>Email</label>
             <input
+              style={inputStyle}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
               type="email"
-              style={inputStyle}
+              required
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: "0.8rem" }}>
-              Password
-            </label>
+            <label style={{ fontSize: "0.8rem" }}>Password</label>
             <input
+              style={inputStyle}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
               type="password"
-              style={inputStyle}
+              required
             />
           </div>
-
           <button
             type="submit"
             style={{
               background: "#2563eb",
               color: "white",
               border: "none",
-              borderRadius: "0.5rem",
-              padding: "0.55rem 0.6rem",
+              borderRadius: "0.6rem",
+              padding: "0.55rem 0",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -92,18 +102,15 @@ export default function LoginPage() {
         {message && (
           <p
             style={{
-              marginTop: "0.8rem",
-              fontSize: "0.8rem",
-              color: message.startsWith("Login successful")
-                ? "green"
-                : "#b91c1c",
+              marginTop: "0.7rem",
+              color: message.startsWith("Login successful") ? "green" : "red",
             }}
           >
             {message}
           </p>
         )}
 
-        <p style={{ marginTop: "0.9rem", fontSize: "0.75rem" }}>
+        <p style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
           New here? <a href="/register">Register as patient</a> or{" "}
           <a href="/register-professional">register as professional</a>
         </p>
@@ -116,6 +123,6 @@ const inputStyle = {
   width: "100%",
   border: "1px solid #d1d5db",
   borderRadius: "0.5rem",
-  padding: "0.4rem 0.5rem",
-  fontSize: "0.85rem",
+  padding: "0.35rem 0.55rem",
+  fontSize: "0.9rem",
 };
