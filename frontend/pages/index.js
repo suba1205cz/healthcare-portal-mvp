@@ -9,19 +9,16 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [region, setRegion] = useState("all");
-  const [date, setDate] = useState("");        // yyyy-mm-dd
-  const [time, setTime] = useState("");        // hh:mm
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [filteredByAvailability, setFilteredByAvailability] = useState(false);
 
-  // small helper to build date-time in ISO
   const buildISO = (d, t) => {
-    // t = "10:00"
-    // we’ll treat entered time as local and convert to ISO
     const iso = new Date(`${d}T${t}:00`);
     return iso.toISOString();
   };
 
-  // load ALL professionals (default)
+  // load all (old behaviour)
   const loadAll = async () => {
     setLoading(true);
     try {
@@ -29,24 +26,23 @@ export default function HomePage() {
       setProfessionals(res.data || []);
       setFilteredByAvailability(false);
     } catch (err) {
-      console.error("fetch professionals failed", err);
+      console.error("fetch failed", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // first load
   useEffect(() => {
     loadAll();
   }, []);
 
-  // when user clicks “Search” or changes filters
   const handleSearch = async () => {
-    // if date and time given → call /search
+    // if user chose date + time → availability search
     if (date && time) {
       const startISO = buildISO(date, time);
-      // we’ll assume 1 hour slot for now
-      const endISO = new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
+      const endISO = new Date(
+        new Date(startISO).getTime() + 60 * 60 * 1000
+      ).toISOString(); // +1 hour
 
       setLoading(true);
       try {
@@ -70,7 +66,7 @@ export default function HomePage() {
       return;
     }
 
-    // otherwise → normal list with text filter
+    // otherwise → old text search
     setLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/api/professionals`, {
@@ -85,54 +81,123 @@ export default function HomePage() {
     }
   };
 
+  // simple card style so it looks like your last nice version
+  const cardStyle = {
+    background: "#ffffff",
+    borderRadius: "18px",
+    padding: "18px",
+    boxShadow: "0 4px 18px rgba(15, 23, 42, 0.06)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  };
+
   return (
-    <div className="min-h-screen bg-[#f3f4f6]">
-      {/* top bar is in layout.js now so we just render body */}
-      <main className="max-w-6xl mx-auto py-6 px-4">
-        {/* hero */}
-        <div className="bg-[#e5f0ff] rounded-3xl px-10 py-10 flex items-center justify-between mb-6">
+    <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
+      {/* main wrapper */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px" }}>
+        {/* hero box */}
+        <div
+          style={{
+            background: "rgba(210, 226, 255, 0.8)",
+            borderRadius: "28px",
+            padding: "32px 36px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
           <div>
-            <h1 className="text-3xl font-semibold text-[#102a43] mb-2">
+            <h1
+              style={{
+                fontSize: "30px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                color: "#102a43",
+              }}
+            >
               Find Home Nursing &amp; Physiotherapy
             </h1>
-            <p className="text-[#475569]">
-              Book verified professionals near you. Kerala, TN, KA — and expats abroad.
+            <p style={{ color: "#475569" }}>
+              Book verified professionals near you. Kerala, TN, KA — and expats
+              abroad.
             </p>
           </div>
-          <div className="w-48 h-28 rounded-2xl border-2 border-dashed border-[#cbd5f5] flex items-center justify-center text-sm text-[#94a3b8] text-center">
+          <div
+            style={{
+              width: "180px",
+              height: "110px",
+              border: "2px dashed #cbd5f5",
+              borderRadius: "18px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "13px",
+              color: "#94a3b8",
+              textAlign: "center",
+            }}
+          >
             patient-care image
           </div>
         </div>
 
-        {/* filters */}
-        <div className="flex flex-wrap gap-3 mb-5">
+        {/* filters row */}
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            marginBottom: "14px",
+            flexWrap: "wrap",
+          }}
+        >
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, specialty, location..."
-            className="flex-1 min-w-[220px] border rounded-lg px-3 py-2 bg-white"
+            style={{
+              flex: 1,
+              minWidth: "220px",
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d4d4d4",
+              background: "#ffffff",
+            }}
           />
 
-          {/* date */}
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            style={{
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d4d4d4",
+              background: "#ffffff",
+            }}
           />
 
-          {/* time */}
           <input
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            style={{
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d4d4d4",
+              background: "#ffffff",
+            }}
           />
 
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            style={{
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d4d4d4",
+              background: "#ffffff",
+            }}
           >
             <option value="all">All categories</option>
             <option value="Nurse">Nurse</option>
@@ -142,7 +207,12 @@ export default function HomePage() {
           <select
             value={region}
             onChange={(e) => setRegion(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            style={{
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #d4d4d4",
+              background: "#ffffff",
+            }}
           >
             <option value="all">All (India + others)</option>
             <option value="Kerala">Kerala</option>
@@ -154,15 +224,23 @@ export default function HomePage() {
 
           <button
             onClick={handleSearch}
-            className="bg-[#2563eb] text-white px-5 py-2 rounded-lg font-medium hover:bg-[#1d4ed8]"
+            style={{
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              padding: "8px 18px",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
           >
             Search
           </button>
         </div>
 
         {filteredByAvailability && (
-          <p className="text-sm text-green-700 mb-3">
-            Showing professionals who are free at {date} {time} (1 hour slot)
+          <p style={{ color: "#166534", marginBottom: "10px" }}>
+            Showing professionals free at {date} {time} (1 hour slot)
           </p>
         )}
 
@@ -172,55 +250,71 @@ export default function HomePage() {
         ) : professionals.length === 0 ? (
           <p>No professionals found.</p>
         ) : (
-          <div className="grid md:grid-cols-3 gap-5">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "16px",
+            }}
+          >
             {professionals
               .filter((p) => {
-                // apply local filters (category / region)
                 let ok = true;
                 if (category !== "all") {
-                  // we didn’t store category on profile, so we check specialties text
                   ok =
-                    p.specialties?.toLowerCase().includes(category.toLowerCase()) ||
-                    p.user?.role === "PROFESSIONAL";
+                    (p.specialties || "")
+                      .toLowerCase()
+                      .includes(category.toLowerCase());
                 }
                 if (ok && region !== "all") {
                   ok =
-                    p.location?.toLowerCase().includes(region.toLowerCase());
+                    (p.location || "")
+                      .toLowerCase()
+                      .includes(region.toLowerCase());
                 }
                 return ok;
               })
               .map((p) => (
-                <div
-                  key={p.id}
-                  className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#2563eb] text-white flex items-center justify-center font-semibold">
+                <div key={p.id} style={cardStyle}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        borderRadius: "9999px",
+                        background: "#2563eb",
+                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 600,
+                      }}
+                    >
                       {(p.user?.name || p.name || "U").slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <h2 className="font-semibold text-[#102a43]">
+                      <div style={{ fontWeight: 600, color: "#102a43" }}>
                         {p.user?.name || p.name}
-                      </h2>
-                      <p className="text-xs text-[#94a3b8]">
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8" }}>
                         {p.location || "India"}
-                      </p>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-sm">
-                    <span className="font-semibold">Specialties:</span>{" "}
+                  <div style={{ fontSize: "13px" }}>
+                    <span style={{ fontWeight: 600 }}>Specialties: </span>
                     {p.specialties || "Not specified"}
-                  </p>
-                  <p className="text-sm">
+                  </div>
+                  <div style={{ fontSize: "13px" }}>
                     From{" "}
-                    <span className="font-semibold">
+                    <span style={{ fontWeight: 600 }}>
                       {p.hourlyRate ? p.hourlyRate : "800"}
                     </span>{" "}
                     per hour
-                  </p>
+                  </div>
                   <a
                     href={`/professionals/${p.id}`}
-                    className="text-[#2563eb] text-sm font-medium"
+                    style={{ color: "#2563eb", fontSize: "13px", fontWeight: 500 }}
                   >
                     View &amp; Book →
                   </a>
@@ -228,7 +322,7 @@ export default function HomePage() {
               ))}
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
