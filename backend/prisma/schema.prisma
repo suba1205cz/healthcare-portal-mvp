@@ -31,6 +31,12 @@ model Profile {
   location       String?
   hourlyRate     Float?
 
+  isApproved     Boolean       @default(false)
+  isRejected       Boolean    @default(false)
+  rejectionReason  String?
+  idProofUrl     String?
+  addressProofUrl String?
+  qualification  String?
   // a professional can have many slots
   availabilities Availability[]
 
