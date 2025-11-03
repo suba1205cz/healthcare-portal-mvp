@@ -78,6 +78,20 @@ export default function HomePage() {
       return;
     }
 
+// near top:
+const user = typeof window !== 'undefined'
+  ? JSON.parse(localStorage.getItem('subaa_user') || 'null')
+  : null;
+
+// in the header/nav area:
+{user?.user?.role === 'ADMIN' && (
+  <a href="/admin/pending"
+     style={{ marginLeft: 16, padding: '8px 12px', border: '1px solid #ccc', borderRadius: 8 }}>
+    Approve professionals
+  </a>
+)}
+
+
     // normal search
     setLoading(true);
     try {

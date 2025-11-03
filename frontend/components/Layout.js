@@ -1,129 +1,77 @@
 // frontend/components/Layout.js
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
 
-  // read from localStorage when page loads (browser only)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("user");
-      if (stored) {
-        try {
-          setUser(JSON.parse(stored));
-        } catch {
-          // bad json, ignore
-        }
-      }
+      const u = localStorage.getItem("user");
+      if (u) setUser(JSON.parse(u));
     }
   }, []);
 
   function handleLogout() {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem("user");
-      window.localStorage.removeItem("token");
-      window.location.href = "/"; // reload to home
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
     }
+    // just reload to reset UI
+    window.location.href = "/";
   }
 
   return (
-    <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
+    <div className="min-h-screen bg-[#f5f6f8]">
       {/* top bar */}
-      <header
-        style={{
-          background: "white",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "0.75rem 1.5rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "1rem",
-        }}
-      >
-        {/* left: logo / name */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: "9999px",
-              background: "#2563eb",
-              color: "white",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 700,
-            }}
-          >
+      <header className="w-full bg-white border-b flex items-center justify-between px-6 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#165DFF] text-white flex items-center justify-center font-semibold">
             S
           </div>
           <div>
-            <div style={{ fontWeight: 700 }}>Subaa Care</div>
-            <div style={{ fontSize: "0.65rem", color: "#6b7280" }}>
-              We care those who you care
-            </div>
+            <div className="font-semibold text-sm">Subaa Care</div>
+            <div className="text-xs text-gray-500">We care those who you care</div>
           </div>
         </div>
 
-        {/* right: menu */}
-        <nav style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <a href="/" style={linkStyle}>
-            Home
-          </a>
-          <a href="/register-professional" style={linkStyle}>
-            Join as professional
-          </a>
+        <nav className="flex items-center gap-5 text-sm">
+          <Link href="/">Home</Link>
+          <Link href="/register-professional">Join as professional</Link>
+          <Link href="/register">Register</Link>
 
-          {!user ? (
+          {/* ✅ show only for admin */}
+          {user?.role === "ADMIN" && (
+            <Link href="/admin/pending" className="text-blue-600 font-medium">
+              Admin
+            </Link>
+          )}
+
+          {user ? (
             <>
-              <a href="/register" style={linkStyle}>
-                Register
-              </a>
-              <a
-                href="/login"
-                style={{
-                  ...linkStyle,
-                  padding: "0.3rem 0.7rem",
-                  background: "#2563eb",
-                  color: "white",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                Sign in
-              </a>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: "0.8rem", color: "#374151" }}>
-                👋 {user.name || user.email}
+              <span className="flex items-center gap-1 text-sm">
+                <span role="img" aria-label="wave">👋</span> {user.name || user.email}
               </span>
               <button
                 onClick={handleLogout}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  background: "white",
-                  borderRadius: "0.4rem",
-                  padding: "0.25rem 0.7rem",
-                  cursor: "pointer",
-                  fontSize: "0.75rem",
-                }}
+                className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm"
               >
                 Logout
               </button>
             </>
+          ) : (
+            <Link
+              href="/login"
+              className="bg-[#165DFF] text-white px-4 py-1 rounded-full text-sm"
+            >
+              Sign in
+            </Link>
           )}
         </nav>
       </header>
 
       {/* page content */}
-      <main style={{ maxWidth: 1180, margin: "0 auto", padding: "1.5rem 1rem" }}>
-        {children}
-      </main>
+      <main className="max-w-6xl mx-auto py-6 px-4">{children}</main>
     </div>
   );
 }
-
-const linkStyle = {
-  fontSize: "0.78rem",
-  color: "#374151",
-  textDecoration: "none",
-};

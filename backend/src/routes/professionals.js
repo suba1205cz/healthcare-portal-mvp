@@ -77,4 +77,39 @@ router.post('/', async (req, res) => {
   }
 });
 
+const { requireAuth } = require('../middleware/auth');
+
+// ...existing routes...
+
+// Get current user's professional profile (requires token)
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const profile = await prisma.profile.findUnique({
+      where: { userId: req.user.id },
+      include: { user: true },
+    });
+    if (!profile) return res.status(404).json({ error: 'No profile found' });
+    res.json(profile);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Optionally get a profile by user id (no auth required if you prefer)
+router.get('/by-user/:userId', async (req, res) => {
+  try {
+    const uid = Number(req.params.userId);
+    const profile = await prisma.profile.findUnique({
+      where: { userId: uid },
+      include: { user: true },
+    });
+    if (!profile) return res.status(404).json({ error: 'No profile found' });
+    res.json(profile);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
 module.exports = router;
