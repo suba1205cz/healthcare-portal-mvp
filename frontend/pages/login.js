@@ -1,128 +1,83 @@
 // frontend/pages/login.js
-import { useState } from "react";
-import { useRouter } from "next/router";
-import axios from "axios";
-import Layout from "../components/Layout";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { useState } from 'react';
+import { useRouter } from 'next/router';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("test@example.com"); // for quick tests
-  const [password, setPassword] = useState("123456");
-  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
+    setError('');
 
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
-        email,
-        password,
+      const res = await fetch(`${apiBase}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      // backend returns { token, user }
-      const { token, user } = res.data || {};
-
-      if (!token || !user) {
-        setMessage("Login failed: no token/user in response");
+      if (!res.ok) {
+        setError('Could not login');
         return;
       }
 
-      // 👇 THIS is the part that makes the navbar know who you are
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("token", token);
-        window.localStorage.setItem("user", JSON.stringify(user));
-      }
+      const data = await res.json();
+      // data = { token, user: { id, name, email, role } }
 
-      setMessage("Login successful. Redirecting…");
-      // force reload so Layout re-reads localStorage
-      router.push("/");
+// save to localStorage so other pages (admin, navbar, etc.) can read
+if (typeof window !== 'undefined') {
+  localStorage.setItem('subaa_user', JSON.stringify(data)); // keep legacy
+  localStorage.setItem('token', data.token);
+  localStorage.setItem('user', JSON.stringify(data.user));
+}
+
+
+      // if admin -> go to /admin/pending
+      if (data.user?.role === 'ADMIN') {
+        router.push('/admin/pending');
+      } else {
+        // patient/professional -> home
+        router.push('/');
+      }
     } catch (err) {
-      console.error("LOGIN ERROR", err?.response?.data || err.message);
-      setMessage(
-        err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Login failed"
-      );
+      console.error(err);
+      setError('Could not login');
     }
   }
 
   return (
-    <Layout>
-      <div
-        style={{
-          maxWidth: 480,
-          margin: "2rem auto",
-          background: "white",
-          borderRadius: "1rem",
-          padding: "1.5rem",
-          border: "1px solid #e5e7eb",
-        }}
-      >
-        <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Sign in</h1>
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.85rem" }}>
-          <div>
-            <label style={{ fontSize: "0.8rem" }}>Email</label>
-            <input
-              style={inputStyle}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              required
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: "0.8rem" }}>Password</label>
-            <input
-              style={inputStyle}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            style={{
-              background: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "0.6rem",
-              padding: "0.55rem 0",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Sign in
-          </button>
-        </form>
-
-        {message && (
-          <p
-            style={{
-              marginTop: "0.7rem",
-              color: message.startsWith("Login successful") ? "green" : "red",
-            }}
-          >
-            {message}
-          </p>
-        )}
-
-        <p style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
-          New here? <a href="/register">Register as patient</a> or{" "}
-          <a href="/register-professional">register as professional</a>
+    <div style={{ padding: '2rem' }}>
+      <h1>Sign in</h1>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <p>
+          <label>Email</label><br />
+          <input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            type="email"
+          />
         </p>
-      </div>
-    </Layout>
+        <p>
+          <label>Password</label><br />
+          <input
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            type="password"
+          />
+        </p>
+        <button type="submit">Sign in</button>
+      </form>
+
+      <p style={{ marginTop: '1rem' }}>
+        New here? <a href="/register">Register as patient</a> or{' '}
+        <a href="/register-professional">register as professional</a>
+      </p>
+    </div>
   );
 }
-
-const inputStyle = {
-  width: "100%",
-  border: "1px solid #d1d5db",
-  borderRadius: "0.5rem",
-  padding: "0.35rem 0.55rem",
-  fontSize: "0.9rem",
-};
