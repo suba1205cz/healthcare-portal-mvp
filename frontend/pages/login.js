@@ -1,83 +1,125 @@
-// frontend/pages/login.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const { login } = useAuth();
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('123456');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     try {
-      const res = await fetch(`${apiBase}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      // use AuthContext login (this calls /api/auth/login for us)
+      const data = await login(email, password);
 
-      if (!res.ok) {
-        setError('Could not login');
-        return;
-      }
+      const role = data.user.role;
 
-      const data = await res.json();
-      // data = { token, user: { id, name, email, role } }
-
-// save to localStorage so other pages (admin, navbar, etc.) can read
-if (typeof window !== 'undefined') {
-  localStorage.setItem('subaa_user', JSON.stringify(data)); // keep legacy
-  localStorage.setItem('token', data.token);
-  localStorage.setItem('user', JSON.stringify(data.user));
-}
-
-
-      // if admin -> go to /admin/pending
-      if (data.user?.role === 'ADMIN') {
-        router.push('/admin/pending');
+      // redirect based on role
+      if (role === 'PATIENT') {
+        router.push('/dashboard');
+      } else if (role === 'PROFESSIONAL') {
+        router.push('/dashboard'); // later we’ll show pro-specific view here
+      } else if (role === 'ADMIN') {
+        router.push('/admin');
       } else {
-        // patient/professional -> home
         router.push('/');
       }
-    } catch (err) {
-      console.error(err);
-      setError('Could not login');
+    } catch (e) {
+      console.error('Login failed', e);
+      setError(
+        e.response?.data?.error || 'Login failed. Please check your details.'
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Sign in</h1>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <p>
-          <label>Email</label><br />
-          <input
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            type="email"
-          />
+    <Layout>
+      <div
+        style={{
+          maxWidth: 420,
+          margin: '2rem auto',
+          background: 'white',
+          padding: '1.5rem',
+          borderRadius: '1rem',
+          boxShadow: '0 10px 35px rgba(15, 23, 42, 0.07)',
+        }}
+      >
+        <h1
+          style={{
+            fontSize: '1.6rem',
+            fontWeight: 700,
+            marginBottom: '0.5rem',
+          }}
+        >
+          Sign in
+        </h1>
+        <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+          Use your registered email and password.
         </p>
-        <p>
-          <label>Password</label><br />
-          <input
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            type="password"
-          />
-        </p>
-        <button type="submit">Sign in</button>
-      </form>
 
-      <p style={{ marginTop: '1rem' }}>
-        New here? <a href="/register">Register as patient</a> or{' '}
-        <a href="/register-professional">register as professional</a>
-      </p>
-    </div>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}
+        >
+          <div>
+            <label style={{ display: 'block', marginBottom: 4 }}>Email</label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={inputStyle}
+              type="email"
+              required
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: 4 }}>
+              Password
+            </label>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={inputStyle}
+              type="password"
+              required
+            />
+          </div>
+
+          {error && <p style={{ color: 'red' }}>{error}</p>}
+
+          <button type="submit" style={primaryBtn} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </Layout>
   );
 }
+
+const inputStyle = {
+  width: '100%',
+  border: '1px solid #d1d5db',
+  borderRadius: '0.5rem',
+  padding: '0.6rem 0.8rem',
+  outline: 'none',
+};
+
+const primaryBtn = {
+  background: '#2563eb',
+  color: 'white',
+  border: 'none',
+  borderRadius: '0.5rem',
+  padding: '0.6rem 0.8rem',
+  cursor: 'pointer',
+  fontWeight: 600,
+};

@@ -1,74 +1,92 @@
-// backend/src/routes/availability.js
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-const { requireAuth } = require('../middleware/auth');
+// auth middleware
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'No token' });
+  const token = header.replace('Bearer ', '');
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
 
-/**
- * Helper: ensure the logged-in user has a Profile and return it.
- * Most availability actions are for professionals.
- */
-async function getOrCreateProfileForUser(userId) {
-  const existing = await prisma.profile.findUnique({ where: { userId } });
-  if (existing) return existing;
-
-  // If no profile exists yet, create a minimal one (not approved by default)
-  return prisma.profile.create({
-    data: {
-      userId,
-      bio: '',
-      specialties: '',
-      location: '',
-      hourlyRate: 0,
-      isApproved: false,
-      isRejected: false,
-    },
+// Helper to get current professional profile
+async function getCurrentProfile(userId) {
+  return prisma.profile.findFirst({
+    where: { userId },
   });
 }
 
-/**
- * POST /api/availability
- * Create a new availability slot for the logged-in professional.
- * Body: { start: ISO string, end: ISO string }
- */
-router.post('/', requireAuth, async (req, res) => {
+// Create availability slot (only for VERIFIED professionals)
+router.post('/', auth, async (req, res) => {
   try {
-    const userId = Number(req.user.id);
     const { start, end } = req.body;
 
     if (!start || !end) {
-      return res.status(400).json({ error: 'start and end are required' });
+      return res
+        .status(400)
+        .json({ error: 'start and end datetime are required' });
     }
 
-    const profile = await getOrCreateProfileForUser(userId);
+    if (req.user.role !== 'PROFESSIONAL') {
+      return res
+        .status(403)
+        .json({ error: 'Only professionals can create availability' });
+    }
+
+    const profile = await getCurrentProfile(req.user.id);
+    if (!profile) {
+      return res
+        .status(400)
+        .json({ error: 'No profile found for this professional' });
+    }
+
+    if (!profile.verified) {
+      return res.status(403).json({
+        error:
+          'Your profile is not yet approved. Wait for admin approval before setting availability.',
+      });
+    }
 
     const slot = await prisma.availability.create({
       data: {
         profileId: profile.id,
         start: new Date(start),
         end: new Date(end),
-        isBooked: false,
       },
     });
 
-    res.json(slot);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not create availability' });
+    res.json({ success: true, slot });
+  } catch (e) {
+    console.error('Error creating availability', e);
+    res.status(500).json({ error: 'Failed to create availability' });
   }
 });
 
-/**
- * GET /api/availability/mine
- * List all availability slots for the logged-in professional.
- */
-router.get('/mine', requireAuth, async (req, res) => {
+// Get my availability slots
+router.get('/mine', auth, async (req, res) => {
   try {
-    const userId = Number(req.user.id);
-    const profile = await prisma.profile.findUnique({ where: { userId } });
-    if (!profile) return res.json([]);
+    if (req.user.role !== 'PROFESSIONAL') {
+      return res
+        .status(403)
+        .json({ error: 'Only professionals can view availability' });
+    }
+
+    const profile = await getCurrentProfile(req.user.id);
+    if (!profile) {
+      return res
+        .status(400)
+        .json({ error: 'No profile found for this professional' });
+    }
 
     const slots = await prisma.availability.findMany({
       where: { profileId: profile.id },
@@ -76,83 +94,9 @@ router.get('/mine', requireAuth, async (req, res) => {
     });
 
     res.json(slots);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not fetch availability' });
-  }
-});
-
-/**
- * DELETE /api/availability/:id
- * Delete one of your own availability slots.
- */
-router.delete('/:id', requireAuth, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const userId = Number(req.user.id);
-
-    const profile = await prisma.profile.findUnique({ where: { userId } });
-    if (!profile) return res.status(404).json({ error: 'Profile not found' });
-
-    const slot = await prisma.availability.findUnique({ where: { id } });
-    if (!slot || slot.profileId !== profile.id) {
-      return res.status(403).json({ error: 'Not allowed' });
-    }
-
-    await prisma.availability.delete({ where: { id } });
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not delete availability' });
-  }
-});
-
-/**
- * (Optional) GET /api/availability/search?start=...&end=...
- * Find approved professionals who have availability in a time window.
- */
-router.get('/search', async (req, res) => {
-  try {
-    const { start, end, location, q } = req.query;
-
-    const whereAvail = {};
-    if (start) whereAvail.start = { gte: new Date(start) };
-    if (end) whereAvail.end = { lte: new Date(end) };
-    whereAvail.isBooked = false;
-
-    const profiles = await prisma.profile.findMany({
-      where: {
-        isApproved: true,
-        isRejected: false,
-        AND: [
-          location
-            ? { location: { contains: String(location), mode: 'insensitive' } }
-            : {},
-          q
-            ? {
-                OR: [
-                  { specialties: { contains: String(q), mode: 'insensitive' } },
-                  { user: { name: { contains: String(q), mode: 'insensitive' } } },
-                ],
-              }
-            : {},
-        ],
-      },
-      include: {
-        user: true,
-        availabilities: {
-          where: whereAvail,
-          orderBy: { start: 'asc' },
-        },
-      },
-    });
-
-    // Only return profiles that actually have free slots in the window
-    const withOpenSlots = profiles.filter(p => (p.availabilities || []).length > 0);
-    res.json(withOpenSlots);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not search availability' });
+  } catch (e) {
+    console.error('Error fetching availability', e);
+    res.status(500).json({ error: 'Failed to fetch availability' });
   }
 });
 

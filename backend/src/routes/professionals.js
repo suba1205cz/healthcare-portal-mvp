@@ -1,20 +1,47 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
+const jwt = require('jsonwebtoken');
+
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-// 1) PATIENT/BROWSER: list professionals (ONLY APPROVED)
+// Auth middleware
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'No token' });
+
+  const token = header.replace('Bearer ', '');
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Admin access only' });
+  }
+  next();
+}
+
+/**
+ * Public: list VERIFIED professionals with optional search filters
+ */
 router.get('/', async (req, res) => {
-  const { q, location } = req.query;
+  try {
+    const { q, location } = req.query;
 
-  const professionals = await prisma.profile.findMany({
-    where: {
-      isApproved: true, // only show approved profiles
+    const where = {
+      verified: true,
       AND: [
         q
           ? {
               OR: [
                 { specialties: { contains: q, mode: 'insensitive' } },
+                { location: { contains: q, mode: 'insensitive' } },
                 { user: { name: { contains: q, mode: 'insensitive' } } },
               ],
             }
@@ -25,90 +52,84 @@ router.get('/', async (req, res) => {
             }
           : {},
       ],
-    },
-    include: { user: true },
-  });
+    };
 
-  res.json(professionals);
-});
-
-// 2) PUBLIC: get one professional
-router.get('/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const profile = await prisma.profile.findUnique({
-    where: { id },
-    include: { user: true, availabilities: true },
-  });
-  if (!profile) return res.status(404).json({ error: 'Not found' });
-  res.json(profile);
-});
-
-// 3) PROFESSIONAL REGISTERS (from /register-professional page)
-router.post('/', async (req, res) => {
-  const {
-    userId,
-    specialties,
-    location,
-    hourlyRate,
-    idProofUrl,
-    addressProofUrl,
-    qualification,
-  } = req.body;
-
-  try {
-    const profile = await prisma.profile.create({
-      data: {
-        userId: Number(userId),
-        bio: '',
-        specialties,
-        location,
-        hourlyRate: Number(hourlyRate) || 0,
-        isApproved: false, // start as NOT approved
-        // these 3 will only work if you added them to Prisma schema
-        idProofUrl,
-        addressProofUrl,
-        qualification,
+    const professionals = await prisma.profile.findMany({
+      where,
+      include: {
+        user: true,
+        ratings: true,
       },
     });
-    res.json(profile);
+
+    res.json(professionals);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: 'Could not create professional profile' });
+    console.error('Error in GET /api/professionals', err);
+    res.status(500).json({ error: 'Failed to fetch professionals' });
   }
 });
 
-const { requireAuth } = require('../middleware/auth');
-
-// ...existing routes...
-
-// Get current user's professional profile (requires token)
-router.get('/me', requireAuth, async (req, res) => {
+/**
+ * Admin: list all PENDING (unverified) professionals
+ */
+router.get('/admin/pending/list', auth, adminOnly, async (req, res) => {
   try {
-    const profile = await prisma.profile.findUnique({
-      where: { userId: req.user.id },
+    const pending = await prisma.profile.findMany({
+      where: { verified: false },
       include: { user: true },
+      orderBy: { createdAt: 'asc' },
     });
-    if (!profile) return res.status(404).json({ error: 'No profile found' });
-    res.json(profile);
+
+    res.json(pending);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    console.error('Error fetching pending professionals', e);
+    res.status(500).json({ error: 'Failed to fetch pending professionals' });
   }
 });
 
-// Optionally get a profile by user id (no auth required if you prefer)
-router.get('/by-user/:userId', async (req, res) => {
+/**
+ * Admin: verify a professional
+ * PUT /api/professionals/admin/verify/:id
+ */
+router.put('/admin/verify/:id', auth, adminOnly, async (req, res) => {
   try {
-    const uid = Number(req.params.userId);
-    const profile = await prisma.profile.findUnique({
-      where: { userId: uid },
-      include: { user: true },
+    const id = parseInt(req.params.id, 10);
+
+    const profile = await prisma.profile.update({
+      where: { id },
+      data: { verified: true },
     });
-    if (!profile) return res.status(404).json({ error: 'No profile found' });
-    res.json(profile);
+
+    res.json({ success: true, profile });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    console.error('Error verifying professional', e);
+    res.status(500).json({ error: 'Failed to verify professional' });
+  }
+});
+
+/**
+ * Public: get single professional by id
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    const professional = await prisma.profile.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        ratings: true,
+      },
+    });
+
+    if (!professional) {
+      return res.status(404).json({ error: 'Professional not found' });
+    }
+
+    res.json(professional);
+  } catch (err) {
+    console.error('Error in GET /api/professionals/:id', err);
+    res.status(500).json({ error: 'Failed to fetch professional' });
   }
 });
 

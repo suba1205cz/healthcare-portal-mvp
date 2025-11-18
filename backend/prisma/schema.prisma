@@ -7,6 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---- ROLES & STATUSES ----
+
+enum Role {
+  PATIENT          // normal user / patient
+  PROFESSIONAL     // nurse / physiotherapist
+  ADMIN            // platform admin (we'll use later)
+  PROVIDER_ADMIN   // organisation/vendor admin (later)
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// ---- USER ----
+
 model User {
   id        Int       @id @default(autoincrement())
   name      String
@@ -15,69 +33,74 @@ model User {
   role      Role      @default(PATIENT)
   createdAt DateTime  @default(now())
 
-  // 1:1
-  profile   Profile?
-
-  // all bookings where this user is the patient
+  profiles  Profile[]
   bookings  Booking[] @relation("PatientBookings")
+  ratings   Rating[]
 }
+
+// ---- PROVIDER PROFILE ----
 
 model Profile {
-  id             Int           @id @default(autoincrement())
-  user           User          @relation(fields: [userId], references: [id])
-  userId         Int           @unique
-  bio            String?
-  specialties    String?
-  location       String?
-  hourlyRate     Float?
+  id              Int          @id @default(autoincrement())
+  userId          Int
+  user            User         @relation(fields: [userId], references: [id])
 
-  isApproved     Boolean       @default(false)
-  isRejected       Boolean    @default(false)
-  rejectionReason  String?
-  idProofUrl     String?
-  addressProofUrl String?
-  qualification  String?
-  // a professional can have many slots
-  availabilities Availability[]
+  specialties     String       // text like "Home nursing, post-op care"
+  location        String       // text like "Kochi, Kerala"
+  bio             String?
+  hourlyRate      Int?         // optional, e.g. 500 (₹ or your currency)
+  experienceYears Int?         // e.g. 8
+  languages       String?      // "English, Malayalam"
+  verified        Boolean      @default(false)
+  createdAt       DateTime     @default(now())
 
-  // a professional can have many bookings
-  bookings       Booking[]
+  availabilities  Availability[]
+  bookings        Booking[]    @relation("ProfessionalBookings")
+  ratings         Rating[]
 }
+
+// ---- PROVIDER AVAILABILITY ----
 
 model Availability {
-  id           Int        @id @default(autoincrement())
-  professional Profile    @relation(fields: [profileId], references: [id])
-  profileId    Int
-  start        DateTime
-  end          DateTime
-  isBooked     Boolean    @default(false)
+  id        Int      @id @default(autoincrement())
+  profileId Int
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  start     DateTime
+  end       DateTime?
+  createdAt DateTime @default(now())
 }
+
+// ---- BOOKING / APPOINTMENT ----
 
 model Booking {
-  id             Int        @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
+  patientId       Int
+  professionalId  Int
+  patient         User           @relation("PatientBookings", fields: [patientId], references: [id])
+  professional    Profile        @relation("ProfessionalBookings", fields: [professionalId], references: [id])
 
-  // patient side
-  patient        User       @relation("PatientBookings", fields: [patientId], references: [id])
-  patientId      Int
+  start           DateTime
+  end             DateTime
+  address         String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  status          BookingStatus  @default(PENDING)
 
-  // professional side
-  professional   Profile    @relation(fields: [professionalId], references: [id])
-  professionalId Int
-
-  start          DateTime
-  end            DateTime
-  createdAt      DateTime   @default(now())
-  status         BookingStatus @default(CONFIRMED)
+  rating          Rating?
 }
 
-enum Role {
-  PATIENT
-  PROFESSIONAL
-  ADMIN
-}
+// ---- RATING / REVIEW ----
 
-enum BookingStatus {
-  CONFIRMED
-  CANCELLED
-  COMPLETED
+model Rating {
+  id            Int       @id @default(autoincrement())
+  appointmentId Int       @unique
+  patientId     Int
+  providerId    Int
+  score         Int       // 1–5
+  comment       String?
+  createdAt     DateTime  @default(now())
+
+  appointment   Booking   @relation(fields: [appointmentId], references: [id])
+  patient       User      @relation(fields: [patientId], references: [id])
+  provider      Profile   @relation(fields: [providerId], references: [id])
 }
